@@ -1,5 +1,5 @@
 {
-  "dependencies": {
-    "firebase": "^11.6.0"
-  }
+  "name": "mobile-farm-advisory-system",
+  "private": true,
+  "description": "Flutter client for Soil Advisor"
 }

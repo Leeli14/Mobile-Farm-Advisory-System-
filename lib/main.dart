@@ -1,31 +1,8 @@
-// ignore_for_file: duplicate_import
-
-// Removed unused import
 import 'package:flutter/material.dart';
+
 import 'screens/crop_selection_screen.dart';
-import 'package:firebase_core/firebase_core.dart';
 
-@pragma('vm:entry-point')
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase
-  try {
-    await Firebase.initializeApp(
-      options: FirebaseOptions(
-        apiKey: "AIzaSyD9m9NVzK_IJOUpUT-libzDuj5uaGmLmHU",
-        authDomain: "farm-advisory-system.firebaseapp.com",
-        projectId: "farm-advisory-system",
-        storageBucket: "farm-advisory-system.firebasestorage.app",
-        messagingSenderId: "293396674022",
-        appId: "1:293396674022:web:cade79b5dd568aa0ed5227",
-        measurementId: "G-GMVYH102JB",
-      ),
-    );
-  } catch (e) {
-    debugPrint('Firebase initialization failed: $e');
-  }
-
+void main() {
   runApp(const SoilAdvisorApp());
 }
 
@@ -34,11 +11,19 @@ class SoilAdvisorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const green = Color(0xFF2E7D32);
+
     return MaterialApp(
       title: 'Soil Advisor',
-      theme: ThemeData.dark(),
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: green,
+          brightness: Brightness.light,
+        ),
+        useMaterial3: true,
+        scaffoldBackgroundColor: const Color(0xFFF5F7F2),
+      ),
       home: const CropSelectionScreen(),
     );
   }
 }
-

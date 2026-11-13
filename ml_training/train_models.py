@@ -1,23 +1,23 @@
-import pandas as pd
-import joblib
-import os
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
+from pathlib import Path
 
+import joblib
+import pandas as pd
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 
 # Where to find data & where to save models
-DATA_DIR = '/workspaces/Soil/ml_training'  # absolute path to the directory
-if not os.path.exists(DATA_DIR):
+DATA_DIR = Path(__file__).resolve().parent
+OUTPUT_DIR = DATA_DIR
+if not DATA_DIR.is_dir():
     raise FileNotFoundError(f"Data directory {DATA_DIR} does not exist.")
-OUTPUT_DIR = DATA_DIR  # models will be saved alongside this script
 
 CROPS = ['tomato', 'potato', 'onion']
 
 for crop in CROPS:
-    csv_path = os.path.join(DATA_DIR, f"{crop}_data_correlated.csv")  # Updated to use data_correlated.csv
+    csv_path = DATA_DIR / f"{crop}_data_correlated.csv"
     print(f"\nLoading {csv_path}…")
-    if not os.path.exists(csv_path):
+    if not csv_path.exists():
         raise FileNotFoundError(f"CSV file {csv_path} does not exist.")
     df = pd.read_csv(csv_path)
 
@@ -43,8 +43,8 @@ for crop in CROPS:
     print(f"  ▶ {crop.title()} accuracy: {acc:.2%}")
 
     # Save model + encoder
-    model_path = os.path.join(OUTPUT_DIR, f"rf_{crop}.pkl")
-    encoder_path = os.path.join(OUTPUT_DIR, f"le_{crop}.pkl")
+    model_path = OUTPUT_DIR / f"rf_{crop}.pkl"
+    encoder_path = OUTPUT_DIR / f"le_{crop}.pkl"
     joblib.dump(clf, model_path)
     joblib.dump(le, encoder_path)
     print(f"  ▶ Saved model to {model_path}")

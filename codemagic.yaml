@@ -5,7 +5,7 @@ workflows:
     environment:
       flutter: stable
       vars:
-        PROJECT_DIR: farm # Path to your Flutter project
+        PROJECT_DIR: .
     scripts:
       - name: Install dependencies
         script: |

@@ -44,8 +44,19 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 node_modules
-node_modules
-node_modules
-node_modules
-node_modules
-node_modules
+
+# Local configuration, credentials, and databases
+.env
+.env.*
+!.env.example
+*.db
+*.sqlite
+*.sqlite3
+*service-account*.json
+*-firebase-adminsdk-*.json
+
+# Python
+.venv/
+venv/
+__pycache__/
+.pytest_cache/
