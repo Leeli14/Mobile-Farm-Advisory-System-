@@ -1,15 +1,18 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 class ApiServices {
   ApiServices({http.Client? client})
     : _client = client ?? http.Client(),
-      baseUrl = const String.fromEnvironment(
-        'API_BASE_URL',
-        defaultValue: 'http://localhost:5000',
-      );
+      baseUrl = _configuredBaseUrl.isNotEmpty
+          ? _configuredBaseUrl
+          : defaultTargetPlatform == TargetPlatform.android
+          ? 'http://192.168.137.1:5000'
+          : 'http://localhost:5000';
 
+  static const _configuredBaseUrl = String.fromEnvironment('API_BASE_URL');
   final http.Client _client;
   final String baseUrl;
   static const _timeout = Duration(seconds: 10);
@@ -27,8 +30,15 @@ class ApiServices {
         .get(Uri.parse('$baseUrl/api/sensor-readings?limit=$limit'))
         .timeout(_timeout);
     final body = _decodeResponse(response);
-    return (body['readings'] as List<dynamic>)
-        .cast<Map<String, dynamic>>();
+    return (body['readings'] as List<dynamic>).cast<Map<String, dynamic>>();
+  }
+
+  Future<Map<String, dynamic>> createDemoReading() async {
+    final response = await _client
+        .post(Uri.parse('$baseUrl/api/demo/sensor-readings'))
+        .timeout(_timeout);
+    final body = _decodeResponse(response);
+    return body['reading'] as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> getPrediction(

@@ -42,6 +42,18 @@ The API listens on `http://localhost:5000`. For a quick local demo, omit
 created on startup; use a migration tool before making production schema
 changes.
 
+For continuous simulated readings, start the local sender in another
+terminal. It posts a new sample every 20 seconds using `SENSOR_INGEST_TOKEN`:
+
+```sh
+python -m backend.sensor_simulator
+```
+
+In development, the first screen's **Start demo** button creates one sample
+reading and opens the Tomato dashboard. The dashboard can create more samples.
+The demo endpoint is available only when `APP_ENV=development`; keep the
+development API on a trusted local network.
+
 For a production WSGI server, run `gunicorn --bind 0.0.0.0:$PORT backend.app:app`.
 
 ### Flutter
@@ -50,11 +62,18 @@ Install Flutter 3.29 or newer, then run:
 
 ```sh
 flutter pub get
-flutter run --dart-define=API_BASE_URL=http://localhost:5000
 ```
 
-For Android emulators use `http://10.0.2.2:5000`. For a deployed app, set
-`API_BASE_URL` to the HTTPS URL of the deployed API at build time:
+Run the app normally from VS Code or with:
+
+```sh
+flutter run
+```
+
+Android devices on this PC's Mobile Hotspot use `http://192.168.137.1:5000`
+by default. Android emulators use `http://10.0.2.2:5000`; set `API_BASE_URL`
+to override the default for another network. For a deployed app, set it to the
+HTTPS URL of the deployed API at build time:
 
 ```sh
 flutter build web \

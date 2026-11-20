@@ -24,6 +24,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
   String? _error;
   bool _isRefreshing = false;
   bool _isPredicting = false;
+  bool _isSimulating = false;
   Timer? _refreshTimer;
 
   @override
@@ -72,27 +73,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
     try {
       final result = await widget.apiServices.getPrediction(
         widget.selectedCrop,
-        {
-          for (final key in _sensorFields)
-            key: reading[key],
-        },
+        {for (final key in _sensorFields) key: reading[key]},
       );
       if (mounted) setState(() => _prediction = result);
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not get advice: $error')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Could not get advice: $error')));
     } finally {
       if (mounted) setState(() => _isPredicting = false);
+    }
+  }
+
+  Future<void> _generateDemoReading() async {
+    if (_isSimulating) return;
+    setState(() => _isSimulating = true);
+    try {
+      await widget.apiServices.createDemoReading();
+      await _refresh();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Demo sensor reading created.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not create demo reading: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _isSimulating = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final reading = _reading;
-    final readingTime = DateTime.tryParse(reading?['timestamp']?.toString() ?? '');
-    final isStale = readingTime == null ||
+    final readingTime = DateTime.tryParse(
+      reading?['timestamp']?.toString() ?? '',
+    );
+    final isStale =
+        readingTime == null ||
         DateTime.now().difference(readingTime.toLocal()) >
             const Duration(minutes: 5);
 
@@ -100,6 +121,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       appBar: AppBar(
         title: Text('${_titleCase(widget.selectedCrop)} advisory'),
         actions: [
+          IconButton(
+            tooltip: 'Generate demo reading',
+            onPressed: _isSimulating ? null : _generateDemoReading,
+            icon:
+                _isSimulating
+                    ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Icon(Icons.sensors),
+          ),
           IconButton(
             tooltip: 'Refresh readings',
             onPressed: _isRefreshing ? null : _refresh,
@@ -118,10 +151,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               if (reading == null)
                 _EmptyReadings(isLoading: _isRefreshing)
               else ...[
-                _SensorStatusCard(
-                  readingTime: readingTime,
-                  isStale: isStale,
-                ),
+                _SensorStatusCard(readingTime: readingTime, isStale: isStale),
                 const SizedBox(height: 12),
                 _SensorReadingsCard(reading: reading),
                 if (_history.length > 1) ...[
@@ -131,13 +161,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 const SizedBox(height: 16),
                 FilledButton.icon(
                   onPressed: _isPredicting ? null : _getPrediction,
-                  icon: _isPredicting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.eco_outlined),
+                  icon:
+                      _isPredicting
+                          ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Icon(Icons.eco_outlined),
                   label: Text(
                     _isPredicting ? 'Preparing advice...' : 'Get crop advice',
                   ),
@@ -193,8 +224,10 @@ class _SensorReadingsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Current soil readings',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Current soil readings',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 8),
             ..._sensorFields.map((field) {
               final value = reading[field];
@@ -217,10 +250,7 @@ class _SensorReadingsCard extends StatelessWidget {
 }
 
 class _SensorStatusCard extends StatelessWidget {
-  const _SensorStatusCard({
-    required this.readingTime,
-    required this.isStale,
-  });
+  const _SensorStatusCard({required this.readingTime, required this.isStale});
 
   final DateTime? readingTime;
   final bool isStale;
@@ -228,9 +258,10 @@ class _SensorStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = isStale ? Colors.orange.shade800 : Colors.green.shade800;
-    final updated = readingTime == null
-        ? 'Update time unavailable'
-        : 'Updated ${readingTime!.toLocal().toString().substring(0, 16)}';
+    final updated =
+        readingTime == null
+            ? 'Update time unavailable'
+            : 'Updated ${readingTime!.toLocal().toString().substring(0, 16)}';
     return Card(
       child: ListTile(
         leading: Icon(
@@ -251,17 +282,20 @@ class _MoistureHistoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final values = readings.reversed
-        .map((reading) => (reading['moisture'] as num).toDouble())
-        .toList();
+    final values =
+        readings.reversed
+            .map((reading) => (reading['moisture'] as num).toDouble())
+            .toList();
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Recent moisture trend',
-                style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              'Recent moisture trend',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 16),
             SizedBox(
               height: 120,
@@ -292,11 +326,12 @@ class _TrendPainter extends CustomPainter {
     final minValue = values.reduce((a, b) => a < b ? a : b);
     final maxValue = values.reduce((a, b) => a > b ? a : b);
     final range = (maxValue - minValue).abs();
-    final line = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
+    final line =
+        Paint()
+          ..color = color
+          ..strokeWidth = 3
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke;
     final path = Path();
     for (var index = 0; index < values.length; index++) {
       final x = size.width * index / (values.length - 1);
@@ -353,9 +388,10 @@ class _PredictionCard extends StatelessWidget {
             ),
             _AdviceLine(
               title: 'Fertilization',
-              content: fertilization is List
-                  ? fertilization.join('\n')
-                  : fertilization?.toString() ?? 'Unavailable',
+              content:
+                  fertilization is List
+                      ? fertilization.join('\n')
+                      : fertilization?.toString() ?? 'Unavailable',
             ),
           ],
         ),
@@ -400,9 +436,11 @@ class _EmptyReadings extends StatelessWidget {
           if (isLoading) const CircularProgressIndicator(),
           if (!isLoading) const Icon(Icons.sensors_off_outlined, size: 44),
           const SizedBox(height: 12),
-          Text(isLoading
-              ? 'Loading the latest sensor readings...'
-              : 'No sensor readings have been received yet.'),
+          Text(
+            isLoading
+                ? 'Loading the latest sensor readings...'
+                : 'No sensor readings have been received yet.',
+          ),
         ],
       ),
     );
@@ -435,7 +473,10 @@ class _ErrorBanner extends StatelessWidget {
 
 String _titleCase(String value) => value
     .split(' ')
-    .map((word) => word.isEmpty
-        ? word
-        : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+    .map(
+      (word) =>
+          word.isEmpty
+              ? word
+              : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}',
+    )
     .join(' ');

@@ -19,6 +19,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.exceptions import BadRequest, TooManyRequests
 
 from backend.utils.advice_generator import get_advice
+from backend.utils.demo_sensor import generate_demo_reading
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -106,6 +107,7 @@ def _database_url():
 def create_app(test_config=None):
     app = Flask(__name__)
     app.config.from_mapping(
+        APP_ENV=os.getenv("APP_ENV", "development").lower(),
         SQLALCHEMY_DATABASE_URI=_database_url(),
         SQLALCHEMY_TRACK_MODIFICATIONS=False,
         SENSOR_INGEST_TOKEN=os.getenv("SENSOR_INGEST_TOKEN"),
@@ -115,11 +117,11 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
-    if os.getenv("APP_ENV") == "production" and not app.config[
+    if app.config["APP_ENV"].lower() == "production" and not app.config[
         "SQLALCHEMY_DATABASE_URI"
     ].startswith("postgresql"):
         raise RuntimeError("Production requires a PostgreSQL DATABASE_URL.")
-    if os.getenv("APP_ENV") == "production" and not app.config.get(
+    if app.config["APP_ENV"].lower() == "production" and not app.config.get(
         "SENSOR_INGEST_TOKEN"
     ):
         raise RuntimeError("Production requires a SENSOR_INGEST_TOKEN.")
@@ -174,6 +176,29 @@ def create_app(test_config=None):
         ).scalars()
         return jsonify({"readings": [reading.to_dict() for reading in readings]})
 
+    def persist_sensor_reading(payload):
+        features, error = validate_features(payload)
+        if error:
+            return None, error
+
+        timestamp = datetime.now(UTC)
+        if "timestamp" in payload:
+            try:
+                timestamp = datetime.fromisoformat(str(payload["timestamp"]))
+                if timestamp.tzinfo is None:
+                    timestamp = timestamp.replace(tzinfo=UTC)
+            except ValueError:
+                return None, "Timestamp must be an ISO 8601 date."
+
+        reading = SensorReading(
+            device_id=str(payload.get("device_id", ""))[:120] or None,
+            timestamp=timestamp,
+            **features,
+        )
+        db.session.add(reading)
+        db.session.commit()
+        return reading, None
+
     @app.post("/api/sensor-readings")
     @limiter.limit("30 per minute")
     def create_sensor_reading():
@@ -190,26 +215,22 @@ def create_app(test_config=None):
         payload = request.get_json()
         if not isinstance(payload, dict):
             return jsonify({"error": "Request body must be a JSON object."}), 400
-        features, error = validate_features(payload)
+
+        reading, error = persist_sensor_reading(payload)
         if error:
             return jsonify({"error": error}), 400
 
-        timestamp = datetime.now(UTC)
-        if "timestamp" in payload:
-            try:
-                timestamp = datetime.fromisoformat(str(payload["timestamp"]))
-                if timestamp.tzinfo is None:
-                    timestamp = timestamp.replace(tzinfo=UTC)
-            except ValueError:
-                return jsonify({"error": "Timestamp must be an ISO 8601 date."}), 400
+        return jsonify({"reading": reading.to_dict()}), 201
 
-        reading = SensorReading(
-            device_id=str(payload.get("device_id", ""))[:120] or None,
-            timestamp=timestamp,
-            **features,
-        )
-        db.session.add(reading)
-        db.session.commit()
+    @app.post("/api/demo/sensor-readings")
+    @limiter.limit("30 per minute")
+    def create_demo_sensor_reading():
+        if app.config["APP_ENV"].lower() != "development":
+            return jsonify({"error": "Demo readings are only available in development."}), 404
+
+        reading, error = persist_sensor_reading(generate_demo_reading())
+        if error:
+            return jsonify({"error": error}), 400
         return jsonify({"reading": reading.to_dict()}), 201
 
     @app.post("/predict")

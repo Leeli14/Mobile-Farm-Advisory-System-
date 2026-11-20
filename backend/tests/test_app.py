@@ -18,16 +18,19 @@ class FakeEncoder:
         return ["Fusarium_Wilt"]
 
 
-def make_client():
+def make_client(**config_overrides):
+    config = {
+        "TESTING": True,
+        "APP_ENV": "development",
+        "SQLALCHEMY_DATABASE_URI": "sqlite://",
+        "SENSOR_INGEST_TOKEN": "test-token",
+        "MODELS": {"tomato": FakeModel()},
+        "LABEL_ENCODERS": {"tomato": FakeEncoder()},
+        "RATELIMIT_STORAGE_URI": "memory://",
+    }
+    config.update(config_overrides)
     app = create_app(
-        {
-            "TESTING": True,
-            "SQLALCHEMY_DATABASE_URI": "sqlite://",
-            "SENSOR_INGEST_TOKEN": "test-token",
-            "MODELS": {"tomato": FakeModel()},
-            "LABEL_ENCODERS": {"tomato": FakeEncoder()},
-            "RATELIMIT_STORAGE_URI": "memory://",
-        }
+        config
     )
     return app.test_client()
 
@@ -75,6 +78,28 @@ def test_sensor_ingestion_requires_token_and_returns_latest_reading():
     latest = client.get("/api/sensor-readings/latest").get_json()["reading"]
     assert latest["device_id"] == "field-1"
     assert latest["moisture"] == 45
+
+
+def test_demo_sensor_endpoint_is_disabled_outside_development():
+    response = make_client(APP_ENV="testing").post("/api/demo/sensor-readings")
+
+    assert response.status_code == 404
+    assert response.get_json()["error"] == (
+        "Demo readings are only available in development."
+    )
+
+
+def test_demo_sensor_endpoint_creates_a_valid_reading_in_development():
+    client = make_client()
+
+    response = client.post("/api/demo/sensor-readings")
+
+    assert response.status_code == 201
+    reading = response.get_json()["reading"]
+    assert reading["device_id"] == "demo-field-1"
+    assert validate_features(
+        {name: reading[name] for name in FEATURE_NAMES}
+    )[1] is None
 
 
 def test_prediction_includes_confidence_and_advice():
